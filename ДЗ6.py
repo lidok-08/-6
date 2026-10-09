@@ -1,6 +1,5 @@
 import requests
-from tkinter import Tk, Label, Button, ttk
-from tkinter import messagebox as mb
+from tkinter import Tk, Label, Button, ttk, messagebox as mb
 from datetime import datetime
 
 # Поддерживаемые криптовалюты (id в CoinGecko API -> отображаемое имя)
@@ -15,8 +14,26 @@ CRYPTO_MAP = {
 API_URL = "https://api.coingecko.com/api/v3/simple/price"
 
 
+def fetch_crypto_prices():
+    """Запрашивает CoinGecko API и возвращает разобранные JSON-данные."""
+    ids = ",".join(CRYPTO_MAP.keys())
+    params = {
+        "ids": ids,
+        "vs_currencies": "usd",
+    }
+    response = requests.get(API_URL, params=params, timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
 def refresh_display():
+
     try:
+        data = fetch_crypto_prices()
+
+        # Очистить таблицу
+        for row in tree.get_children():
+            tree.delete(row)
 
         # Заполнить данными
         for coin_id, display_name in CRYPTO_MAP.items():
@@ -27,8 +44,14 @@ def refresh_display():
                 price_str = "Н/Д"
             tree.insert("", "end", values=(display_name, price_str))
 
+        # Обновить строку состояния
+        now = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+        status_label.config(text=f"Статус: данные обновлены {now}")
+
+    except requests.exceptions.RequestException as e:
+        mb.showerror("Ошибка сети", f"Не удалось связаться с API: {e}")
     except (KeyError, ValueError) as e:
-        mb.showerror("Ошибка данных", f"Получены некорректные данные: {e}")
+        mb.showerror("Ошибка", f"Получены некорректные данные: {e}")
 
 
 # ---------- Построение интерфейса ----------
@@ -41,7 +64,7 @@ root.resizable(False, False)
 title_label = Label(
     root,
     text="Курсы популярных криптовалют к USD",
-    font=("Arial", 12),
+    font=("Arial", 13, "bold"),
 )
 title_label.pack(pady=10)
 
@@ -61,5 +84,8 @@ refresh_btn.pack(pady=10)
 # Строка состояния
 status_label = Label(root, text="Статус: ожидание обновления...", fg="red")
 status_label.pack(pady=5)
+
+# Автоматическая загрузка при запуске
+root.after(100, refresh_display)
 
 root.mainloop()
